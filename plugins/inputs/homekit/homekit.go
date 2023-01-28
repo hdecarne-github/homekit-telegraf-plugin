@@ -19,8 +19,10 @@ import (
 	"sync"
 	"time"
 
+	dnssdlog "github.com/brutella/dnssd/log"
 	"github.com/brutella/hap"
 	"github.com/brutella/hap/accessory"
+	haplog "github.com/brutella/hap/log"
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/inputs"
 )
@@ -31,13 +33,14 @@ var manufacturer = "https://hdecarne-github.github.io/homekit-telegraf-plugin/"
 var model = "homekit-telegraf-plugin"
 
 type HomeKit struct {
-	Address               string `toml:"address"`
-	MonitorPath           string `toml:"monitor_path"`
-	AuthorizationRequired bool   `toml:"authorization_required"`
-	HAPStorePath          string `toml:"hap_store_path"`
-	MonitorAccessoryName  string `toml:"monitor_accessory_name"`
-	MonitorAccessoryPin   string `toml:"monitor_accessory_pin"`
-	Debug                 bool   `toml:"debug"`
+	Address               string   `toml:"address"`
+	MonitorPath           string   `toml:"monitor_path"`
+	AuthorizationRequired bool     `toml:"authorization_required"`
+	HAPStorePath          string   `toml:"hap_store_path"`
+	MonitorAccessoryName  string   `toml:"monitor_accessory_name"`
+	MonitorAccessoryPin   string   `toml:"monitor_accessory_pin"`
+	ActiveStateValues     []string `toml:"active_state_values"`
+	Debug                 bool     `toml:"debug"`
 
 	Log telegraf.Logger
 
@@ -57,7 +60,8 @@ func NewHomeKit() *HomeKit {
 		AuthorizationRequired: true,
 		HAPStorePath:          ".hap",
 		MonitorAccessoryName:  "Monitor",
-		MonitorAccessoryPin:   "00102003"}
+		MonitorAccessoryPin:   "00102003",
+		ActiveStateValues:     []string{"Yes"}}
 }
 
 func (plugin *HomeKit) SampleConfig() string {
@@ -74,6 +78,8 @@ func (plugin *HomeKit) SampleConfig() string {
   # monitor_accessory_name = "Monitor"
   ## The pin to use for pairing the monitor accessory
   # monitor_accessory_pin = 00102003
+  ## Active state values
+  # active_state_values = ["Yes"]
   ## Enable debug output
   # debug = false
 `
@@ -95,7 +101,12 @@ func (plugin *HomeKit) Gather(acc telegraf.Accumulator) error {
 
 func (plugin *HomeKit) Start(acc telegraf.Accumulator) error {
 	plugin.acc = acc
+	if !plugin.Debug {
+		haplog.Info.Disable()
+		dnssdlog.Info.Disable()
+	}
 	plugin.Log.Infof("Setting up monitor accessory: %s", plugin.MonitorAccessoryName)
+	haplog.Info.Disable()
 	plugin.accessory = accessory.NewSwitch(accessory.Info{
 		Name:         plugin.MonitorAccessoryName,
 		SerialNumber: serialNumber,
@@ -194,9 +205,14 @@ func (plugin *HomeKit) processData(data map[string]string) {
 		switch dataType {
 		case "TEMP":
 			plugin.processTempData(dataType, dataRoom, dataName, value)
+		case "LIGHT":
+			plugin.processLightData(dataType, dataRoom, dataName, value)
 		case "LIGHTLEVEL":
 			plugin.processLightLevelData(dataType, dataRoom, dataName, value)
+		case "STATE":
+			plugin.processStateData(dataType, dataRoom, dataName, value)
 		default:
+			plugin.Log.Warnf("Unrecognized data entry: %s = %s", key, value)
 		}
 	}
 }
@@ -238,6 +254,21 @@ func (plugin *HomeKit) parseTempValue(value string) (float64, error) {
 	return parsed, nil
 }
 
+func (plugin *HomeKit) processLightData(dataType string, dataRoom string, dataName string, value string) {
+	light, err := strconv.Atoi(value)
+	if err != nil {
+		plugin.Log.Warnf("Failed to process light data: %s (cause: %v)", value, err)
+		return
+	}
+	tags := make(map[string]string)
+	tags["homekit_monitor"] = plugin.MonitorAccessoryName
+	tags["homekit_room"] = dataRoom
+	tags["homekit_accessory"] = dataName
+	fields := make(map[string]interface{})
+	fields["light"] = light
+	plugin.acc.AddCounter("homekit_light", fields, tags)
+}
+
 func (plugin *HomeKit) processLightLevelData(dataType string, dataRoom string, dataName string, value string) {
 	level, err := plugin.parseLightLevelValue(value)
 	if err != nil {
@@ -269,6 +300,23 @@ func (plugin *HomeKit) parseLightLevelValue(value string) (float64, error) {
 	}
 	parsed = math.Round(conversion(parsed)*100.0) / 100.0
 	return parsed, nil
+}
+
+func (plugin *HomeKit) processStateData(dataType string, dataRoom string, dataName string, value string) {
+	state := false
+	for _, stateValue := range plugin.ActiveStateValues {
+		if value == stateValue {
+			state = true
+			break
+		}
+	}
+	tags := make(map[string]string)
+	tags["homekit_monitor"] = plugin.MonitorAccessoryName
+	tags["homekit_room"] = dataRoom
+	tags["homekit_accessory"] = dataName
+	fields := make(map[string]interface{})
+	fields["state"] = state
+	plugin.acc.AddCounter("homekit_state", fields, tags)
 }
 
 func init() {
