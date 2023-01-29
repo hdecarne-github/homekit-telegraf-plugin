@@ -39,7 +39,7 @@ type HomeKit struct {
 	HAPStorePath          string   `toml:"hap_store_path"`
 	MonitorAccessoryName  string   `toml:"monitor_accessory_name"`
 	MonitorAccessoryPin   string   `toml:"monitor_accessory_pin"`
-	ActiveStateValues     []string `toml:"active_state_values"`
+	ActiveValues          []string `toml:"active_values"`
 	Debug                 bool     `toml:"debug"`
 
 	Log telegraf.Logger
@@ -61,7 +61,7 @@ func NewHomeKit() *HomeKit {
 		HAPStorePath:          ".hap",
 		MonitorAccessoryName:  "Monitor",
 		MonitorAccessoryPin:   "00102003",
-		ActiveStateValues:     []string{"Yes"}}
+		ActiveValues:          []string{"Yes", "Ja"}}
 }
 
 func (plugin *HomeKit) SampleConfig() string {
@@ -78,8 +78,8 @@ func (plugin *HomeKit) SampleConfig() string {
   # monitor_accessory_name = "Monitor"
   ## The pin to use for pairing the monitor accessory
   # monitor_accessory_pin = 00102003
-  ## Active state values
-  # active_state_values = ["Yes"]
+  ## Active values
+  # active_values = ["Yes", "Ja"]
   ## Enable debug output
   # debug = false
 `
@@ -189,7 +189,11 @@ func (plugin *HomeKit) monitor(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	plugin.processData(data)
-	res.Write([]byte("Ok"))
+	if plugin.Debug {
+		res.Write(bodyBytes)
+	} else {
+		res.Write([]byte("Ok"))
+	}
 }
 
 func (plugin *HomeKit) processData(data map[string]string) {
@@ -255,7 +259,7 @@ func (plugin *HomeKit) parseTempValue(value string) (float64, error) {
 }
 
 func (plugin *HomeKit) processLightData(dataType string, dataRoom string, dataName string, value string) {
-	light, err := strconv.Atoi(value)
+	active, err := plugin.parseActiveValue(value)
 	if err != nil {
 		plugin.Log.Warnf("Failed to process light data: %s (cause: %v)", value, err)
 		return
@@ -265,8 +269,19 @@ func (plugin *HomeKit) processLightData(dataType string, dataRoom string, dataNa
 	tags["homekit_room"] = dataRoom
 	tags["homekit_accessory"] = dataName
 	fields := make(map[string]interface{})
-	fields["light"] = light
+	fields["active"] = active
 	plugin.acc.AddCounter("homekit_light", fields, tags)
+}
+
+func (plugin *HomeKit) parseActiveValue(value string) (bool, error) {
+	active := false
+	for _, activeValue := range plugin.ActiveValues {
+		if value == activeValue {
+			active = true
+			break
+		}
+	}
+	return active, nil
 }
 
 func (plugin *HomeKit) processLightLevelData(dataType string, dataRoom string, dataName string, value string) {
@@ -303,19 +318,17 @@ func (plugin *HomeKit) parseLightLevelValue(value string) (float64, error) {
 }
 
 func (plugin *HomeKit) processStateData(dataType string, dataRoom string, dataName string, value string) {
-	state := false
-	for _, stateValue := range plugin.ActiveStateValues {
-		if value == stateValue {
-			state = true
-			break
-		}
+	active, err := plugin.parseActiveValue(value)
+	if err != nil {
+		plugin.Log.Warnf("Failed to process state data: %s (cause: %v)", value, err)
+		return
 	}
 	tags := make(map[string]string)
 	tags["homekit_monitor"] = plugin.MonitorAccessoryName
 	tags["homekit_room"] = dataRoom
 	tags["homekit_accessory"] = dataName
 	fields := make(map[string]interface{})
-	fields["state"] = state
+	fields["active"] = active
 	plugin.acc.AddCounter("homekit_state", fields, tags)
 }
 
