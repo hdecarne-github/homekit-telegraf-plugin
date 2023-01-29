@@ -273,11 +273,11 @@ func (plugin *HomeKit) processLightData(dataType string, dataRoom string, dataNa
 	plugin.acc.AddCounter("homekit_light", fields, tags)
 }
 
-func (plugin *HomeKit) parseActiveValue(value string) (bool, error) {
-	active := false
+func (plugin *HomeKit) parseActiveValue(value string) (int, error) {
+	active := 0
 	for _, activeValue := range plugin.ActiveValues {
 		if value == activeValue {
-			active = true
+			active = 1
 			break
 		}
 	}
