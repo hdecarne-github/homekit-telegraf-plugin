@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -39,8 +38,15 @@ type HomeKit struct {
 	HAPStorePath          string   `toml:"hap_store_path"`
 	MonitorAccessoryName  string   `toml:"monitor_accessory_name"`
 	MonitorAccessoryPin   string   `toml:"monitor_accessory_pin"`
+	CelsiusSuffixes       []string `toml:"celsius_suffixex"`
+	FahrenheitSuffixes    []string `toml:"fahrenheit_suffixes"`
+	LuxSuffixes           []string `toml:"lux_suffixes"`
+	HueSuffixes           []string `toml:"hue_suffixes"`
 	ActiveValues          []string `toml:"active_values"`
+	InactiveValues        []string `toml:"inactive_values"`
 	Debug                 bool     `toml:"debug"`
+	HAPDebug              bool     `toml:"hap_debug"`
+	DNSSDDebug            bool     `toml:"dnssd_debug"`
 
 	Log telegraf.Logger
 
@@ -61,7 +67,12 @@ func NewHomeKit() *HomeKit {
 		HAPStorePath:          ".hap",
 		MonitorAccessoryName:  "Monitor",
 		MonitorAccessoryPin:   "00102003",
-		ActiveValues:          []string{"Yes", "Ja"}}
+		CelsiusSuffixes:       []string{" °C"},
+		FahrenheitSuffixes:    []string{" °F"},
+		LuxSuffixes:           []string{" lx"},
+		HueSuffixes:           []string{"°"},
+		ActiveValues:          []string{"Yes", "Ja"},
+		InactiveValues:        []string{"No", "Nein"}}
 }
 
 func (plugin *HomeKit) SampleConfig() string {
@@ -104,6 +115,12 @@ func (plugin *HomeKit) Start(acc telegraf.Accumulator) error {
 	if !plugin.Debug {
 		haplog.Info.Disable()
 		dnssdlog.Info.Disable()
+	}
+	if plugin.HAPDebug {
+		haplog.Debug.Enable()
+	}
+	if plugin.DNSSDDebug {
+		dnssdlog.Debug.Enable()
 	}
 	plugin.Log.Infof("Setting up monitor accessory: %s", plugin.MonitorAccessoryName)
 	haplog.Info.Disable()
@@ -199,137 +216,160 @@ func (plugin *HomeKit) monitor(res http.ResponseWriter, req *http.Request) {
 func (plugin *HomeKit) processData(data map[string]string) {
 	for key, value := range data {
 		keyParts := strings.SplitN(key, "_", 3)
-		if len(keyParts) != 3 {
-			plugin.Log.Warnf("Invalid data key: %s", key)
+		name := ""
+		room := "undefined"
+		characteristic := "generic"
+		switch len(keyParts) {
+		case 1:
+			name = keyParts[0]
+		case 2:
+			name = keyParts[0]
+			room = keyParts[1]
+		case 3:
+			name = keyParts[0]
+			room = keyParts[1]
+			characteristic = keyParts[2]
+		default:
+			plugin.Log.Warnf("Ignoring invalid data key: %s = %s", key, value)
 			continue
 		}
-		dataType := keyParts[0]
-		dataRoom := keyParts[1]
-		dataName := keyParts[2]
-		switch dataType {
-		case "TEMP":
-			plugin.processTempData(dataType, dataRoom, dataName, value)
-		case "LIGHT":
-			plugin.processLightData(dataType, dataRoom, dataName, value)
-		case "LIGHTLEVEL":
-			plugin.processLightLevelData(dataType, dataRoom, dataName, value)
-		case "STATE":
-			plugin.processStateData(dataType, dataRoom, dataName, value)
-		default:
-			plugin.Log.Warnf("Unrecognized data entry: %s = %s", key, value)
+		err := plugin.processDataValue(name, room, characteristic, value)
+		if err != nil {
+			plugin.Log.Warnf("Ignoreing invalid data value: %s = %s (cause: %v)", key, value, err)
 		}
 	}
 }
 
-func (plugin *HomeKit) processTempData(dataType string, dataRoom string, dataName string, value string) {
-	temperature, err := plugin.parseTempValue(value)
-	if err != nil {
-		plugin.Log.Warnf("Failed to process temperature data: %s (cause: %v)", value, err)
-		return
+func (plugin *HomeKit) processDataValue(name string, room string, characteristic string, value string) error {
+	for _, celsiusSuffix := range plugin.CelsiusSuffixes {
+		if strings.HasSuffix(value, celsiusSuffix) {
+			return plugin.processCelsiusValue(name, room, characteristic, value, celsiusSuffix)
+		}
 	}
-	tags := make(map[string]string)
-	tags["homekit_monitor"] = plugin.MonitorAccessoryName
-	tags["homekit_room"] = dataRoom
-	tags["homekit_accessory"] = dataName
-	fields := make(map[string]interface{})
-	fields["temperature"] = temperature
-	plugin.acc.AddCounter("homekit_temperature", fields, tags)
-}
-
-func (plugin *HomeKit) parseTempValue(value string) (float64, error) {
-	parsed := 0.0
-	cSuffix := " °C"
-	fSuffix := " °F"
-	suffix := cSuffix
-	conversion := func(c float64) float64 { return c }
-	if strings.HasSuffix(value, fSuffix) {
-		suffix = fSuffix
-		conversion = func(c float64) float64 { return (c * 1.8) + 32.0 }
-	} else if !strings.HasSuffix(value, cSuffix) {
-		return parsed, fmt.Errorf("unrecognized temperature value: %s", value)
+	for _, fahrenheitSuffix := range plugin.FahrenheitSuffixes {
+		if strings.HasSuffix(value, fahrenheitSuffix) {
+			return plugin.processFahrenheitValue(name, room, characteristic, value, fahrenheitSuffix)
+		}
 	}
-	rawValue := strings.TrimSuffix(value, suffix)
-	rawValue = strings.ReplaceAll(rawValue, ",", ".")
-	parsed, err := strconv.ParseFloat(rawValue, 64)
-	if err != nil {
-		return parsed, fmt.Errorf("failed to parse temperature value: %s (cause: %v)", rawValue, err)
+	for _, luxSuffix := range plugin.LuxSuffixes {
+		if strings.HasSuffix(value, luxSuffix) {
+			return plugin.processLuxValue(name, room, characteristic, value, luxSuffix)
+		}
 	}
-	parsed = math.Round(conversion(parsed)*100.0) / 100.0
-	return parsed, nil
-}
-
-func (plugin *HomeKit) processLightData(dataType string, dataRoom string, dataName string, value string) {
-	active, err := plugin.parseActiveValue(value)
-	if err != nil {
-		plugin.Log.Warnf("Failed to process light data: %s (cause: %v)", value, err)
-		return
+	for _, hueSuffix := range plugin.HueSuffixes {
+		if strings.HasSuffix(value, hueSuffix) {
+			return plugin.processHueValue(name, room, characteristic, value, hueSuffix)
+		}
 	}
-	tags := make(map[string]string)
-	tags["homekit_monitor"] = plugin.MonitorAccessoryName
-	tags["homekit_room"] = dataRoom
-	tags["homekit_accessory"] = dataName
-	fields := make(map[string]interface{})
-	fields["active"] = active
-	plugin.acc.AddCounter("homekit_light", fields, tags)
-}
-
-func (plugin *HomeKit) parseActiveValue(value string) (int, error) {
-	active := 0
 	for _, activeValue := range plugin.ActiveValues {
 		if value == activeValue {
-			active = 1
-			break
+			return plugin.processStateValue(name, room, characteristic, true)
 		}
 	}
-	return active, nil
+	for _, inactiveValue := range plugin.InactiveValues {
+		if value == inactiveValue {
+			return plugin.processStateValue(name, room, characteristic, false)
+		}
+	}
+	return fmt.Errorf("unrecognized value type")
 }
 
-func (plugin *HomeKit) processLightLevelData(dataType string, dataRoom string, dataName string, value string) {
-	level, err := plugin.parseLightLevelValue(value)
+func (plugin *HomeKit) processCelsiusValue(name string, room string, characteristic string, value string, suffix string) error {
+	celsiusValue := strings.TrimSuffix(value, suffix)
+	celsius, err := plugin.parseFloat(celsiusValue)
 	if err != nil {
-		plugin.Log.Warnf("Failed to process light level data: %s (cause: %v)", value, err)
-		return
+		return err
 	}
 	tags := make(map[string]string)
 	tags["homekit_monitor"] = plugin.MonitorAccessoryName
-	tags["homekit_room"] = dataRoom
-	tags["homekit_accessory"] = dataName
+	tags["homekit_name"] = name
+	tags["homekit_room"] = room
+	tags["homekit_characteristic"] = characteristic
 	fields := make(map[string]interface{})
-	fields["level"] = level
-	plugin.acc.AddCounter("homekit_lightlevel", fields, tags)
+	fields["celsius"] = celsius
+	fields["fahrenheit"] = (celsius * 1.8) + 32.0
+	plugin.acc.AddCounter("homekit_temperature", fields, tags)
+	return nil
 }
 
-func (plugin *HomeKit) parseLightLevelValue(value string) (float64, error) {
-	parsed := 0.0
-	lxSuffix := " lx"
-	suffix := lxSuffix
-	conversion := func(c float64) float64 { return c }
-	if !strings.HasSuffix(value, lxSuffix) {
-		return parsed, fmt.Errorf("unrecognized light level value: %s", value)
-	}
-	rawValue := strings.TrimSuffix(value, suffix)
-	rawValue = strings.ReplaceAll(rawValue, ",", ".")
-	parsed, err := strconv.ParseFloat(rawValue, 64)
+func (plugin *HomeKit) processFahrenheitValue(name string, room string, characteristic string, value string, suffix string) error {
+	fahrenheitValue := strings.TrimSuffix(value, suffix)
+	fahrenheit, err := plugin.parseFloat(fahrenheitValue)
 	if err != nil {
-		return parsed, fmt.Errorf("failed to parse light level value: %s (cause: %v)", rawValue, err)
-	}
-	parsed = math.Round(conversion(parsed)*100.0) / 100.0
-	return parsed, nil
-}
-
-func (plugin *HomeKit) processStateData(dataType string, dataRoom string, dataName string, value string) {
-	active, err := plugin.parseActiveValue(value)
-	if err != nil {
-		plugin.Log.Warnf("Failed to process state data: %s (cause: %v)", value, err)
-		return
+		return err
 	}
 	tags := make(map[string]string)
 	tags["homekit_monitor"] = plugin.MonitorAccessoryName
-	tags["homekit_room"] = dataRoom
-	tags["homekit_accessory"] = dataName
+	tags["homekit_name"] = name
+	tags["homekit_room"] = room
+	tags["homekit_characteristic"] = characteristic
+	fields := make(map[string]interface{})
+	fields["celsius"] = (fahrenheit - 32.0) / 1.8
+	fields["fahrenheit"] = fahrenheit
+	plugin.acc.AddCounter("homekit_temperature", fields, tags)
+	return nil
+}
+
+func (plugin *HomeKit) processLuxValue(name string, room string, characteristic string, value string, suffix string) error {
+	luxValue := strings.TrimSuffix(value, suffix)
+	lux, err := plugin.parseFloat(luxValue)
+	if err != nil {
+		return err
+	}
+	tags := make(map[string]string)
+	tags["homekit_monitor"] = plugin.MonitorAccessoryName
+	tags["homekit_name"] = name
+	tags["homekit_room"] = room
+	tags["homekit_characteristic"] = characteristic
+	fields := make(map[string]interface{})
+	fields["lux"] = lux
+	plugin.acc.AddCounter("homekit_lightlevel", fields, tags)
+	return nil
+}
+
+func (plugin *HomeKit) processHueValue(name string, room string, characteristic string, value string, suffix string) error {
+	hueValue := strings.TrimSuffix(value, suffix)
+	hue, err := strconv.Atoi(hueValue)
+	if err != nil {
+		return err
+	}
+	tags := make(map[string]string)
+	tags["homekit_monitor"] = plugin.MonitorAccessoryName
+	tags["homekit_name"] = name
+	tags["homekit_room"] = room
+	tags["homekit_characteristic"] = characteristic
+	fields := make(map[string]interface{})
+	fields["hue"] = hue
+	plugin.acc.AddCounter("homekit_lighthue", fields, tags)
+	return nil
+}
+
+func (plugin *HomeKit) processStateValue(name string, room string, characteristic string, active bool) error {
+	var percent int
+	if active {
+		percent = 100
+	} else {
+		percent = 0
+	}
+	tags := make(map[string]string)
+	tags["homekit_monitor"] = plugin.MonitorAccessoryName
+	tags["homekit_name"] = name
+	tags["homekit_room"] = room
+	tags["homekit_characteristic"] = characteristic
 	fields := make(map[string]interface{})
 	fields["active"] = active
+	fields["percent"] = percent
 	plugin.acc.AddCounter("homekit_state", fields, tags)
+	return nil
+}
+
+func (plugin *HomeKit) parseFloat(value string) (float64, error) {
+	comma := strings.LastIndex(value, ",")
+	cValue := value
+	if comma >= 0 {
+		cValue = strings.ReplaceAll(cValue, ",", ".")
+	}
+	return strconv.ParseFloat(cValue, 64)
 }
 
 func init() {
