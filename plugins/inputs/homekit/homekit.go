@@ -215,6 +215,9 @@ func (plugin *HomeKit) monitor(res http.ResponseWriter, req *http.Request) {
 
 func (plugin *HomeKit) processData(data map[string]string) {
 	for key, value := range data {
+		if plugin.Debug {
+			plugin.Log.Infof("Processing data: %s = %s", key, value)
+		}
 		keyParts := strings.SplitN(key, "_", 3)
 		name := ""
 		room := "undefined"
@@ -323,7 +326,7 @@ func (plugin *HomeKit) processLuxValue(name string, room string, characteristic 
 	tags["homekit_characteristic"] = characteristic
 	fields := make(map[string]interface{})
 	fields["lux"] = lux
-	plugin.acc.AddCounter("homekit_lightlevel", fields, tags)
+	plugin.acc.AddCounter("homekit_light_level", fields, tags)
 	return nil
 }
 
@@ -340,7 +343,7 @@ func (plugin *HomeKit) processHueValue(name string, room string, characteristic 
 	tags["homekit_characteristic"] = characteristic
 	fields := make(map[string]interface{})
 	fields["hue"] = hue
-	plugin.acc.AddCounter("homekit_lighthue", fields, tags)
+	plugin.acc.AddCounter("homekit_light_hue", fields, tags)
 	return nil
 }
 
