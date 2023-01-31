@@ -89,8 +89,18 @@ func (plugin *HomeKit) SampleConfig() string {
   # monitor_accessory_name = "Monitor"
   ## The pin to use for pairing the monitor accessory
   # monitor_accessory_pin = 00102003
-  ## Active values
+  ## Celsius temperature value suffixes
+  # celsius_suffixes = [" °C"]
+  ## Fahrenheit temperature value suffixes
+  # fahrenheit_suffixes = [" °F"]
+  ## Lux value suffixes
+  # lux_suffixes = [" lx"]
+  ## Hue value suffixes
+  # hue_suffixes = ["°"]
+  ## Values representing an active state
   # active_values = ["Yes", "Ja"]
+  ## Values representing an inactive state
+  # inactive_values = ["No", "Nein"]
   ## Enable debug output
   # debug = false
 `
