@@ -36,7 +36,7 @@ func TestDescription(t *testing.T) {
 	require.NotNil(t, description)
 }
 
-func TestRun(t *testing.T) {
+func TestRunSuccess(t *testing.T) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)
 	address := listener.Addr().String()
@@ -45,6 +45,7 @@ func TestRun(t *testing.T) {
 	plugin := NewHomeKit()
 	plugin.Address = address
 	plugin.AuthorizationRequired = false
+	plugin.HAPStorePath = "../../../build/.hap"
 	plugin.MonitorAccessoryName = "TestMonitor"
 	plugin.Log = createDummyLogger()
 	plugin.Debug = true
@@ -56,7 +57,7 @@ func TestRun(t *testing.T) {
 	require.NoError(t, plugin.Gather(acc))
 
 	statusCode := putJson(t, address, `{
-		"Name_Room": "Yes"
+		"Name": "Yes"
 	}`)
 	require.Equal(t, http.StatusOK, statusCode)
 	acc.AssertContainsTaggedFields(t, "homekit_state",
@@ -66,7 +67,7 @@ func TestRun(t *testing.T) {
 		map[string]string{
 			"homekit_monitor":        "TestMonitor",
 			"homekit_name":           "Name",
-			"homekit_room":           "Room",
+			"homekit_room":           "undefined",
 			"homekit_characteristic": "generic"})
 
 	acc.ClearMetrics()
@@ -101,7 +102,7 @@ func TestRun(t *testing.T) {
 
 	acc.ClearMetrics()
 	statusCode = putJson(t, address, `{
-		"Name_Room_Light": "Nein"
+		"Name_Room": "Nein"
 	}`)
 	require.Equal(t, http.StatusOK, statusCode)
 	acc.AssertContainsTaggedFields(t, "homekit_state",
@@ -112,7 +113,7 @@ func TestRun(t *testing.T) {
 			"homekit_monitor":        "TestMonitor",
 			"homekit_name":           "Name",
 			"homekit_room":           "Room",
-			"homekit_characteristic": "Light"})
+			"homekit_characteristic": "generic"})
 
 	acc.ClearMetrics()
 	statusCode = putJson(t, address, `{
@@ -210,6 +211,38 @@ func putJson(t *testing.T, address string, json string) int {
 	rsp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	return rsp.StatusCode
+}
+
+func TestRunFailures(t *testing.T) {
+	listener, err := net.Listen("tcp", "localhost:0")
+	require.NoError(t, err)
+	address := listener.Addr().String()
+	require.NoError(t, listener.Close())
+
+	plugin := NewHomeKit()
+	plugin.Address = address
+	plugin.AuthorizationRequired = false
+	plugin.HAPStorePath = "../../../build/.hap"
+	plugin.MonitorAccessoryName = "TestMonitor"
+	plugin.Log = createDummyLogger()
+	plugin.Debug = true
+
+	acc := &testutil.Accumulator{}
+
+	defer plugin.Stop()
+	require.NoError(t, plugin.Start(acc))
+	require.NoError(t, plugin.Gather(acc))
+
+	rsp, err := http.Get(fmt.Sprintf("http://%s/monitor", address))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadRequest, rsp.StatusCode)
+
+	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://%s/monitor", address), strings.NewReader("<xml></xml>"))
+	req.Header.Add("Content-type", "application/xml")
+	require.NoError(t, err)
+	rsp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadRequest, rsp.StatusCode)
 }
 
 func createDummyLogger() *dummyLogger {
