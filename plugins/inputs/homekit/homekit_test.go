@@ -45,6 +45,7 @@ func TestRun(t *testing.T) {
 	plugin := NewHomeKit()
 	plugin.Address = address
 	plugin.AuthorizationRequired = false
+	plugin.MonitorAccessoryName = "TestMonitor"
 	plugin.Log = createDummyLogger()
 	plugin.Debug = true
 
@@ -54,29 +55,161 @@ func TestRun(t *testing.T) {
 	require.NoError(t, plugin.Start(acc))
 	require.NoError(t, plugin.Gather(acc))
 
-	rsp, err := putJson(address, `{
-		"State accessory A_Room 1": "Yes",
-		"State accessory B_Room 1": "No",
-		"Light accessory A_Room 1_Light": "Yes",
-		"Light accessory B_Room 1_Light": "No",
-		"State accessory C_Room 1": "Ja",
-		"State accessory D_Room 1": "Nein",
-		"Temperature sensor accessory E_Room 2": "42,3 °C",
-		"Temperature sensor accessory F_Room 2": "42,3 °F",
-		"Light sensor accessory G_Room 3": "10 lx",
-		"Light accessory G_Room 3": "360°"
+	statusCode := putJson(t, address, `{
+		"Name_Room": "Yes"
 	}`)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, rsp.StatusCode)
+	require.Equal(t, http.StatusOK, statusCode)
+	acc.AssertContainsTaggedFields(t, "homekit_state",
+		map[string]interface{}{
+			"active":  true,
+			"percent": 100},
+		map[string]string{
+			"homekit_monitor":        "TestMonitor",
+			"homekit_name":           "Name",
+			"homekit_room":           "Room",
+			"homekit_characteristic": "generic"})
+
+	acc.ClearMetrics()
+	statusCode = putJson(t, address, `{
+		"Name_Room": "No"
+	}`)
+	require.Equal(t, http.StatusOK, statusCode)
+	acc.AssertContainsTaggedFields(t, "homekit_state",
+		map[string]interface{}{
+			"active":  false,
+			"percent": 0},
+		map[string]string{
+			"homekit_monitor":        "TestMonitor",
+			"homekit_name":           "Name",
+			"homekit_room":           "Room",
+			"homekit_characteristic": "generic"})
+
+	acc.ClearMetrics()
+	statusCode = putJson(t, address, `{
+		"Name_Room_Light": "Ja"
+	}`)
+	require.Equal(t, http.StatusOK, statusCode)
+	acc.AssertContainsTaggedFields(t, "homekit_state",
+		map[string]interface{}{
+			"active":  true,
+			"percent": 100},
+		map[string]string{
+			"homekit_monitor":        "TestMonitor",
+			"homekit_name":           "Name",
+			"homekit_room":           "Room",
+			"homekit_characteristic": "Light"})
+
+	acc.ClearMetrics()
+	statusCode = putJson(t, address, `{
+		"Name_Room_Light": "Nein"
+	}`)
+	require.Equal(t, http.StatusOK, statusCode)
+	acc.AssertContainsTaggedFields(t, "homekit_state",
+		map[string]interface{}{
+			"active":  false,
+			"percent": 0},
+		map[string]string{
+			"homekit_monitor":        "TestMonitor",
+			"homekit_name":           "Name",
+			"homekit_room":           "Room",
+			"homekit_characteristic": "Light"})
+
+	acc.ClearMetrics()
+	statusCode = putJson(t, address, `{
+		"Name_Room": "12.3 °C"
+	}`)
+	require.Equal(t, http.StatusOK, statusCode)
+	acc.AssertContainsTaggedFields(t, "homekit_temperature",
+		map[string]interface{}{
+			"celsius":    12.3,
+			"fahrenheit": 54.14},
+		map[string]string{
+			"homekit_monitor":        "TestMonitor",
+			"homekit_name":           "Name",
+			"homekit_room":           "Room",
+			"homekit_characteristic": "generic"})
+
+	acc.ClearMetrics()
+	statusCode = putJson(t, address, `{
+		"Name_Room": "54.14 °F"
+	}`)
+	require.Equal(t, http.StatusOK, statusCode)
+	acc.AssertContainsTaggedFields(t, "homekit_temperature",
+		map[string]interface{}{
+			"celsius":    12.3,
+			"fahrenheit": 54.14},
+		map[string]string{
+			"homekit_monitor":        "TestMonitor",
+			"homekit_name":           "Name",
+			"homekit_room":           "Room",
+			"homekit_characteristic": "generic"})
+
+	acc.ClearMetrics()
+	statusCode = putJson(t, address, `{
+				"Name_Room": "12,3 °C"
+			}`)
+	require.Equal(t, http.StatusOK, statusCode)
+	acc.AssertContainsTaggedFields(t, "homekit_temperature",
+		map[string]interface{}{
+			"celsius":    12.3,
+			"fahrenheit": 54.14},
+		map[string]string{
+			"homekit_monitor":        "TestMonitor",
+			"homekit_name":           "Name",
+			"homekit_room":           "Room",
+			"homekit_characteristic": "generic"})
+
+	acc.ClearMetrics()
+	statusCode = putJson(t, address, `{
+				"Name_Room": "54,14 °F"
+			}`)
+	require.Equal(t, http.StatusOK, statusCode)
+	acc.AssertContainsTaggedFields(t, "homekit_temperature",
+		map[string]interface{}{
+			"celsius":    12.3,
+			"fahrenheit": 54.14},
+		map[string]string{
+			"homekit_monitor":        "TestMonitor",
+			"homekit_name":           "Name",
+			"homekit_room":           "Room",
+			"homekit_characteristic": "generic"})
+
+	acc.ClearMetrics()
+	statusCode = putJson(t, address, `{
+		"Name_Room": "10 lx"
+	}`)
+	require.Equal(t, http.StatusOK, statusCode)
+	acc.AssertContainsTaggedFields(t, "homekit_light_level",
+		map[string]interface{}{
+			"lux": 10.0},
+		map[string]string{
+			"homekit_monitor":        "TestMonitor",
+			"homekit_name":           "Name",
+			"homekit_room":           "Room",
+			"homekit_characteristic": "generic"})
+
+	acc.ClearMetrics()
+	statusCode = putJson(t, address, `{
+		"Name_Room": "360°"
+	}`)
+	require.Equal(t, http.StatusOK, statusCode)
+	acc.AssertContainsTaggedFields(t, "homekit_light_hue",
+		map[string]interface{}{
+			"hue": 360},
+		map[string]string{
+			"homekit_monitor":        "TestMonitor",
+			"homekit_name":           "Name",
+			"homekit_room":           "Room",
+			"homekit_characteristic": "generic"})
 }
 
-func putJson(address string, json string) (*http.Response, error) {
+func putJson(t *testing.T, address string, json string) int {
 	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://%s/monitor", address), strings.NewReader(json))
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(t, err)
 	req.Header.Add("Content-type", "application/json")
-	return http.DefaultClient.Do(req)
+	rsp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return rsp.StatusCode
 }
 
 func createDummyLogger() *dummyLogger {
