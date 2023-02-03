@@ -44,7 +44,6 @@ func TestRunSuccess(t *testing.T) {
 
 	plugin := NewHomeKit()
 	plugin.Address = address
-	plugin.AuthorizationRequired = false
 	plugin.HAPStorePath = "../../../build/.hap"
 	plugin.MonitorAccessoryName = "TestMonitor"
 	plugin.Log = createDummyLogger()
@@ -221,7 +220,6 @@ func TestRunFailures(t *testing.T) {
 
 	plugin := NewHomeKit()
 	plugin.Address = address
-	plugin.AuthorizationRequired = false
 	plugin.HAPStorePath = "../../../build/.hap"
 	plugin.MonitorAccessoryName = "TestMonitor"
 	plugin.Log = createDummyLogger()

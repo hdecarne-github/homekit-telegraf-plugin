@@ -32,21 +32,20 @@ var manufacturer = "https://hdecarne-github.github.io/homekit-telegraf-plugin/"
 var model = "homekit-telegraf-plugin"
 
 type HomeKit struct {
-	Address               string   `toml:"address"`
-	MonitorPath           string   `toml:"monitor_path"`
-	AuthorizationRequired bool     `toml:"authorization_required"`
-	HAPStorePath          string   `toml:"hap_store_path"`
-	MonitorAccessoryName  string   `toml:"monitor_accessory_name"`
-	MonitorAccessoryPin   string   `toml:"monitor_accessory_pin"`
-	CelsiusSuffixes       []string `toml:"celsius_suffixex"`
-	FahrenheitSuffixes    []string `toml:"fahrenheit_suffixes"`
-	LuxSuffixes           []string `toml:"lux_suffixes"`
-	HueSuffixes           []string `toml:"hue_suffixes"`
-	ActiveValues          []string `toml:"active_values"`
-	InactiveValues        []string `toml:"inactive_values"`
-	Debug                 bool     `toml:"debug"`
-	HAPDebug              bool     `toml:"hap_debug"`
-	DNSSDDebug            bool     `toml:"dnssd_debug"`
+	Address              string   `toml:"address"`
+	MonitorPath          string   `toml:"monitor_path"`
+	HAPStorePath         string   `toml:"hap_store_path"`
+	MonitorAccessoryName string   `toml:"monitor_accessory_name"`
+	MonitorAccessoryPin  string   `toml:"monitor_accessory_pin"`
+	CelsiusSuffixes      []string `toml:"celsius_suffixex"`
+	FahrenheitSuffixes   []string `toml:"fahrenheit_suffixes"`
+	LuxSuffixes          []string `toml:"lux_suffixes"`
+	HueSuffixes          []string `toml:"hue_suffixes"`
+	ActiveValues         []string `toml:"active_values"`
+	InactiveValues       []string `toml:"inactive_values"`
+	Debug                bool     `toml:"debug"`
+	HAPDebug             bool     `toml:"hap_debug"`
+	DNSSDDebug           bool     `toml:"dnssd_debug"`
 
 	Log telegraf.Logger
 
@@ -61,18 +60,17 @@ type HomeKit struct {
 
 func NewHomeKit() *HomeKit {
 	return &HomeKit{
-		Address:               ":8001",
-		MonitorPath:           "/monitor",
-		AuthorizationRequired: true,
-		HAPStorePath:          ".hap",
-		MonitorAccessoryName:  "Monitor",
-		MonitorAccessoryPin:   "00102003",
-		CelsiusSuffixes:       []string{" °C"},
-		FahrenheitSuffixes:    []string{" °F"},
-		LuxSuffixes:           []string{" lx"},
-		HueSuffixes:           []string{"°"},
-		ActiveValues:          []string{"Yes", "Ja"},
-		InactiveValues:        []string{"No", "Nein"}}
+		Address:              ":8001",
+		MonitorPath:          "/monitor",
+		HAPStorePath:         ".hap",
+		MonitorAccessoryName: "Monitor",
+		MonitorAccessoryPin:  "00102003",
+		CelsiusSuffixes:      []string{" °C"},
+		FahrenheitSuffixes:   []string{" °F"},
+		LuxSuffixes:          []string{" lx"},
+		HueSuffixes:          []string{"°"},
+		ActiveValues:         []string{"Yes", "Ja"},
+		InactiveValues:       []string{"No", "Nein"}}
 }
 
 func (plugin *HomeKit) SampleConfig() string {
@@ -82,8 +80,6 @@ func (plugin *HomeKit) SampleConfig() string {
   ## The path to receive monitor requests on
   # monitor_path = "/monitor"
   ## Only allow authorized clients to send monitor requests
-  # authorization_required = true
-  ## The directory path to create for storing the HAP state (e.g. paring state)
   # hap_store_path = ".hap"
   ## The name of the monitor accessory to use for triggering home automation
   # monitor_accessory_name = "Monitor"
@@ -179,11 +175,6 @@ func (plugin *HomeKit) monitor(res http.ResponseWriter, req *http.Request) {
 	}
 	if plugin.Debug {
 		plugin.Log.Infof("Handling monitor request: %s", req.RemoteAddr)
-	}
-	if plugin.AuthorizationRequired && !plugin.server.IsAuthorized(req) {
-		plugin.Log.Warnf("Client not authorized: %s", req.RemoteAddr)
-		res.WriteHeader(http.StatusForbidden)
-		return
 	}
 	if req.URL.Path != plugin.MonitorPath {
 		plugin.Log.Warnf("Invalid path: %s", req.URL.Path)
