@@ -17,7 +17,7 @@ deps:
 
 .PHONY: testdeps
 testdeps: deps
-	go install honnef.co/go/tools/cmd/staticcheck@2022.1.3
+	go install honnef.co/go/tools/cmd/staticcheck@latest
 
 .PHONY: tidy
 tidy:
