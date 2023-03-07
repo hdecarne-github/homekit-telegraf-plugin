@@ -6,7 +6,8 @@ GOBIN ?= $(shell go env GOPATH)/bin
 
 plugin_name := $(shell cat plugin.txt)
 plugin_version :=  $(shell cat version.txt)
-plugin_cmd := $(plugin_name)-telegraf-plugin
+plugin_project := $(plugin_name)-telegraf-plugin
+plugin_module := github.com/hdecarne-github/$(plugin_project)
 plugin_conf := $(plugin_name).conf
 
 .DEFAULT_GOAL := build
@@ -17,7 +18,7 @@ deps:
 
 .PHONY: testdeps
 testdeps: deps
-	go install honnef.co/go/tools/cmd/staticcheck@latest
+	go install honnef.co/go/tools/cmd/staticcheck@2023.1
 
 .PHONY: tidy
 tidy:
@@ -27,9 +28,9 @@ tidy:
 .PHONY: build
 build: deps
 ifneq (windows, $(GOOS))
-	go build -ldflags "$(LDFLAGS) -X github.com/hdecarne-github/$(plugin_cmd)/plugins/inputs/$(plugin_name)/$(plugin_name).firmware=$(plugin_version)" -o build/bin/$(plugin_cmd) ./cmd/$(plugin_cmd)
+	go build -ldflags "$(LDFLAGS) -X $(plugin_module)/plugins/inputs/$(plugin_name).firmware=$(plugin_version)" -o build/bin/$(plugin_project) ./cmd/$(plugin_project)
 else
-	go build -o build/bin/$(plugin_cmd).exe ./cmd/$(plugin_cmd)
+	go build -ldflags "$(LDFLAGS) -X $(plugin_module)/plugins/inputs/$(plugin_name).firmware=$(plugin_version)" -o build/bin/$(plugin_project).exe ./cmd/$(plugin_project)
 endif
 	cp $(plugin_conf) build/bin/
 

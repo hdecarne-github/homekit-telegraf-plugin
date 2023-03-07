@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -121,6 +122,9 @@ func (plugin *HomeKit) Start(acc telegraf.Accumulator) error {
 	if !plugin.Debug {
 		haplog.Info.Disable()
 		dnssdlog.Info.Disable()
+		discard, _ := os.OpenFile(os.DevNull, os.O_APPEND|os.O_WRONLY, os.ModePerm)
+		os.Stdout = discard
+		os.Stdin = discard
 	}
 	if plugin.HAPDebug {
 		haplog.Debug.Enable()
@@ -129,7 +133,6 @@ func (plugin *HomeKit) Start(acc telegraf.Accumulator) error {
 		dnssdlog.Debug.Enable()
 	}
 	plugin.Log.Infof("Setting up monitor accessory: %s", plugin.MonitorAccessoryName)
-	haplog.Info.Disable()
 	plugin.accessory = accessory.NewSwitch(accessory.Info{
 		Name:         plugin.MonitorAccessoryName,
 		SerialNumber: serialNumber,
@@ -181,7 +184,10 @@ func (plugin *HomeKit) monitor(res http.ResponseWriter, req *http.Request) {
 		http.NotFound(res, req)
 		return
 	}
-	if req.Method != http.MethodPut {
+	if req.Method == http.MethodGet {
+		res.Write([]byte(fmt.Sprintf("%s (version %s)", model, firmware)))
+		return
+	} else if req.Method != http.MethodPut {
 		plugin.Log.Warnf("Invalid method: %s", req.Method)
 		res.WriteHeader(http.StatusBadRequest)
 		return
