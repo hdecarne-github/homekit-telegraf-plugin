@@ -231,13 +231,15 @@ func TestRunFailures(t *testing.T) {
 	require.NoError(t, plugin.Start(acc))
 	require.NoError(t, plugin.Gather(acc))
 
-	rsp, err := http.Get(fmt.Sprintf("http://%s/monitor", address))
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://%s/monitor", address), strings.NewReader("<xml></xml>"))
+	require.NoError(t, err)
+	rsp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusBadRequest, rsp.StatusCode)
 
-	req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("http://%s/monitor", address), strings.NewReader("<xml></xml>"))
-	req.Header.Add("Content-type", "application/xml")
+	req, err = http.NewRequest(http.MethodPut, fmt.Sprintf("http://%s/monitor", address), strings.NewReader("<xml></xml>"))
 	require.NoError(t, err)
+	req.Header.Add("Content-type", "application/xml")
 	rsp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusBadRequest, rsp.StatusCode)
