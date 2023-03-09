@@ -384,20 +384,17 @@ func (plugin *HomeKit) processHueValue(name string, room string, characteristic 
 }
 
 func (plugin *HomeKit) processStateValue(name string, room string, characteristic string, active bool) error {
-	var percent int
-	if active {
-		percent = 100
-	} else {
-		percent = 0
-	}
 	tags := make(map[string]string)
 	tags["homekit_monitor"] = plugin.MonitorAccessoryName
 	tags["homekit_name"] = name
 	tags["homekit_room"] = room
 	tags["homekit_characteristic"] = characteristic
 	fields := make(map[string]interface{})
-	fields["active"] = active
-	fields["percent"] = percent
+	if active {
+		fields["active"] = 1
+	} else {
+		fields["active"] = 0
+	}
 	plugin.acc.AddCounter("homekit_state", fields, tags)
 	return nil
 }

@@ -61,8 +61,7 @@ func TestRunSuccess(t *testing.T) {
 	require.Equal(t, http.StatusOK, statusCode)
 	acc.AssertContainsTaggedFields(t, "homekit_state",
 		map[string]interface{}{
-			"active":  true,
-			"percent": 100},
+			"active": 1},
 		map[string]string{
 			"homekit_monitor":        "TestMonitor",
 			"homekit_name":           "Name",
@@ -76,8 +75,7 @@ func TestRunSuccess(t *testing.T) {
 	require.Equal(t, http.StatusOK, statusCode)
 	acc.AssertContainsTaggedFields(t, "homekit_state",
 		map[string]interface{}{
-			"active":  false,
-			"percent": 0},
+			"active": 0},
 		map[string]string{
 			"homekit_monitor":        "TestMonitor",
 			"homekit_name":           "Name",
@@ -91,8 +89,7 @@ func TestRunSuccess(t *testing.T) {
 	require.Equal(t, http.StatusOK, statusCode)
 	acc.AssertContainsTaggedFields(t, "homekit_state",
 		map[string]interface{}{
-			"active":  true,
-			"percent": 100},
+			"active": 1},
 		map[string]string{
 			"homekit_monitor":        "TestMonitor",
 			"homekit_name":           "Name",
@@ -106,8 +103,7 @@ func TestRunSuccess(t *testing.T) {
 	require.Equal(t, http.StatusOK, statusCode)
 	acc.AssertContainsTaggedFields(t, "homekit_state",
 		map[string]interface{}{
-			"active":  false,
-			"percent": 0},
+			"active": 0},
 		map[string]string{
 			"homekit_monitor":        "TestMonitor",
 			"homekit_name":           "Name",
