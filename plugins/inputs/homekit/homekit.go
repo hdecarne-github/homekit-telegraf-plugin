@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -35,6 +36,7 @@ var model = "homekit-telegraf-plugin"
 type HomeKit struct {
 	Address              string   `toml:"address"`
 	MonitorPath          string   `toml:"monitor_path"`
+	MonitorHosts         []string `toml:"monitor_hosts"`
 	HAPStorePath         string   `toml:"hap_store_path"`
 	MonitorAccessoryName string   `toml:"monitor_accessory_name"`
 	MonitorAccessoryPin  string   `toml:"monitor_accessory_pin"`
@@ -63,6 +65,7 @@ func NewHomeKit() *HomeKit {
 	return &HomeKit{
 		Address:              ":8001",
 		MonitorPath:          "/monitor",
+		MonitorHosts:         make([]string, 0),
 		HAPStorePath:         ".hap",
 		MonitorAccessoryName: "Monitor",
 		MonitorAccessoryPin:  "00102003",
@@ -80,6 +83,8 @@ func (plugin *HomeKit) SampleConfig() string {
   address = ":8001"
   ## The path to receive monitor requests on
   # monitor_path = "/monitor"
+  ## The host names/IPs allowed to send monitor requests (leave empty to allow any host)
+  # monitor_hosts = []
   ## Only allow authorized clients to send monitor requests
   # hap_store_path = ".hap"
   ## The name of the monitor accessory to use for triggering home automation
@@ -179,6 +184,11 @@ func (plugin *HomeKit) monitor(res http.ResponseWriter, req *http.Request) {
 	if plugin.Debug {
 		plugin.Log.Infof("Handling monitor request: %s", req.RemoteAddr)
 	}
+	if !plugin.isAllowedMonitorHost(req.RemoteAddr) {
+		plugin.Log.Warnf("Unallowed monitor host: %s", req.RemoteAddr)
+		res.WriteHeader(http.StatusForbidden)
+		return
+	}
 	if req.URL.Path != plugin.MonitorPath {
 		plugin.Log.Warnf("Invalid path: %s", req.URL.Path)
 		http.NotFound(res, req)
@@ -218,6 +228,25 @@ func (plugin *HomeKit) monitor(res http.ResponseWriter, req *http.Request) {
 	} else {
 		res.Write([]byte("Ok"))
 	}
+}
+
+func (plugin *HomeKit) isAllowedMonitorHost(remote string) bool {
+	if len(plugin.MonitorHosts) == 0 {
+		return true
+	}
+	for _, monitorHost := range plugin.MonitorHosts {
+		monitorAddrs, err := net.LookupHost(monitorHost)
+		if err != nil {
+			plugin.Log.Warnf("Failed to look up host '%s' (cause: %v)", monitorHost, err)
+			continue
+		}
+		for _, monitorAddr := range monitorAddrs {
+			if strings.HasPrefix(remote, monitorAddr+":") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (plugin *HomeKit) processData(data map[string]string) {
