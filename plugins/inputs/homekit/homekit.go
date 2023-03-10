@@ -80,7 +80,7 @@ func NewHomeKit() *HomeKit {
 func (plugin *HomeKit) SampleConfig() string {
 	return `
   ## The address (host:port) to run the HAP server on
-  address = ":8001"
+  # address = ":8001"
   ## The path to receive monitor requests on
   # monitor_path = "/monitor"
   ## The host names/IPs allowed to send monitor requests (leave empty to allow any host)
