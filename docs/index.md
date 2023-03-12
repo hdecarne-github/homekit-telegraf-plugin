@@ -92,7 +92,7 @@ After pairing the virtual switch accessory using the configured pin, accessory s
 For the first action select the Get Home Status action and define the accessory to query as well as the state to query. See section **Mapping of accessory readings to measurements** for which states are supported.
 For the second action select the Read URL Content action. The URL to read is the plugin's URL according to your configuration. As Method select PUT and for the Request Body select JSON. Add a text field with the queried accessory state as the value and a name build up as described in section **JSON field name decoding**.
 
-![Automation](docs/screen_automation.png)
+![Automation](screen_automation.png)
 
 For short lived events like motion detections, the configuration described above may not be sufficent due to its polling based approach.
 In such a case the push state action can be configured directly to the event of interest, resulting in an online state update whenever the
@@ -135,7 +135,7 @@ homekit_state,homekit_characteristic=Light,homekit_monitor=Monitor,homekit_name=
 ```
 The state value is reported as 0 (inactive) or 1 (active).
 
-![Lights & Motions](docs/screen_lights_and_motions.png)
+![Lights & Motions](screen_lights_and_motions.png)
 
 ### Temperature measurement (homekit_temperature)
 All temperature states are reported via the **homekit_temperature** measurement:
@@ -144,7 +144,7 @@ homekit_temperature,homekit_characteristic=generic,homekit_monitor=Monitor,homek
 ```
 Values are always reported in Celsius as well as in Fahrenheit.
 
-![Temperatures](docs/screen_temperatures.png)
+![Temperatures](screen_temperatures.png)
 
 ### Light Level measurement (homekit_light_level)
 All light level states are reported via the **homekit_light_level** measurement:
@@ -153,7 +153,7 @@ homekit_light_level,homekit_characteristic=generic,homekit_monitor=Monitor,homek
 ```
 The light level values are reported in Lux.
 
-![Light Levels](docs/screen_light_levels.png)
+![Light Levels](screen_light_levels.png)
 
 ### License
 This project is subject to the the MIT License.
