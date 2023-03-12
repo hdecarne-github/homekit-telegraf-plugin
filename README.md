@@ -94,7 +94,7 @@ For the second action select the Read URL Content action. The URL to read is the
 
 The following screenshots shows an example for such an automation setup:
 
-![Automation](docs/screen_automation.png){: width="250" }
+![Automation](docs/screen_automation.png)
 
 For short lived events like motion detections, the configuration described above may not be sufficent due to its polling based approach.
 In such a case the push state action can be configured directly to the event of interest, resulting in an online state update whenever the

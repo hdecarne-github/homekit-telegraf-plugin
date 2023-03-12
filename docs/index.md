@@ -1,7 +1,3 @@
-[![Downloads](https://img.shields.io/github/downloads/hdecarne-github/homekit-telegraf-plugin/total.svg)](https://github.com/hdecarne-github/homekit-telegraf-plugin/releases)
-[![Build](https://github.com/hdecarne-github/homekit-telegraf-plugin/actions/workflows/build.yml/badge.svg)](https://github.com/hdecarne-github/homekit-telegraf-plugin/actions/workflows/build.yml)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=hdecarne-github_homekit-telegraf-plugin&metric=coverage)](https://sonarcloud.io/summary/new_code?id=hdecarne-github_homekit-telegraf-plugin)
-
 ## About homekit-telegraf-plugin
 This [Telegraf](https://github.com/influxdata/telegraf) input plugin monitors stats of [HomeKit](https://en.wikipedia.org/wiki/HomeKit) accessories. As HomeKit accessories cannot easily queried from outside HomeKit, this plugin uses the following approach:
 - The accessories are actually queried by manually configuring an automation in the [Home app](https://support.apple.com/en-us/HT208940). As mentioned in the linked document, this requires a home hub (HomePod or AppleTV).
@@ -94,7 +90,7 @@ For the second action select the Read URL Content action. The URL to read is the
 
 The following screenshots shows an example for such an automation setup:
 
-![Automation](screen_automation.png){: width="250" }
+![Automation](screen_automation.png)
 
 For short lived events like motion detections, the configuration described above may not be sufficent due to its polling based approach.
 In such a case the push state action can be configured directly to the event of interest, resulting in an online state update whenever the
