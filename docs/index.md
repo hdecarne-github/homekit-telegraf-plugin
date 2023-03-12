@@ -92,7 +92,9 @@ After pairing the virtual switch accessory using the configured pin, accessory s
 For the first action select the Get Home Status action and define the accessory to query as well as the state to query. See section **Mapping of accessory readings to measurements** for which states are supported.
 For the second action select the Read URL Content action. The URL to read is the plugin's URL according to your configuration. As Method select PUT and for the Request Body select JSON. Add a text field with the queried accessory state as the value and a name build up as described in section **JSON field name decoding**.
 
-![Automation](screen_automation.png)
+The following screenshots shows an example for such an automation setup:
+
+![Automation](screen_automation.png | width=240)
 
 For short lived events like motion detections, the configuration described above may not be sufficent due to its polling based approach.
 In such a case the push state action can be configured directly to the event of interest, resulting in an online state update whenever the
