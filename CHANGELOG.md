@@ -13,3 +13,6 @@ SOFTWARE.
 
 ### v0.1.1 (2023-01-28)
 * Initial release
+
+### v0.2.0 (2024-01-14)
+* Update dependencies
